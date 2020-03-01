@@ -51,6 +51,16 @@ const char SSL_CA_PEM[] = "-----BEGIN CERTIFICATE-----\n"
 "0Gs4+eH6F9h3SojmPTYkT+8KuZ9w84Mn+M8qBXUQoYoKgIjN\n"
 "-----END CERTIFICATE-----\n";
 
+void dump_response(HttpResponse* res) {
+    printf("Status: %d - %s\n", res->get_status_code(), res->get_status_message().c_str());
+
+    printf("Headers:\n");
+    for (size_t ix = 0; ix < res->get_headers_length(); ix++) {
+        printf("\t%s: %s\n", res->get_headers_fields()[ix]->c_str(), res->get_headers_values()[ix]->c_str());
+    }
+    printf("\nBody (%lu bytes):\n\n%s\n", res->get_body_length(), res->get_body_as_string().c_str());
+}
+
 const char *sec2str(nsapi_security_t sec)
 {
     switch (sec) {
@@ -128,19 +138,21 @@ void pressed_handler() {
     wifi->get_gateway(&a);
     pc.printf("Gateway: %s\n", a.get_ip_address());
     pc.printf("RSSI: %d\n\n", wifi->get_rssi());
+    
+    printf("\n----- HTTPS GET request -----\n");
+    HttpsRequest* get_req = new HttpsRequest(wifi, SSL_CA_PEM, HTTP_GET, "https://www.example.com");
 
+    HttpResponse* get_res = get_req->send();
+    if (!get_res) {
+        printf("HttpRequest failed (error code %d)\n", get_req->get_error());
+        return 1;
+    }
+    printf("\n----- HTTPS GET response -----\n");
+    dump_response(get_res);
+    delete get_req;
+    
     wifi->disconnect();
     pc.printf("\nDone\n");    
-}
-
-void dump_response(HttpResponse* res) {
-    printf("Status: %d - %s\n", res->get_status_code(), res->get_status_message().c_str());
-
-    printf("Headers:\n");
-    for (size_t ix = 0; ix < res->get_headers_length(); ix++) {
-        printf("\t%s: %s\n", res->get_headers_fields()[ix]->c_str(), res->get_headers_values()[ix]->c_str());
-    }
-    printf("\nBody (%lu bytes):\n\n%s\n", res->get_body_length(), res->get_body_as_string().c_str());
 }
 
 int main() {
@@ -153,19 +165,6 @@ int main() {
     t.start(callback(&queue, &EventQueue::dispatch_forever));
     button.fall(queue.event(pressed_handler));
     pc.printf("Starting\n");
-    
-    printf("\n----- HTTPS GET request -----\n");
-
-    HttpsRequest* get_req = new HttpsRequest(wifi, SSL_CA_PEM, HTTP_GET, "https://www.example.com");
-
-    HttpResponse* get_res = get_req->send();
-    if (!get_res) {
-        printf("HttpRequest failed (error code %d)\n", get_req->get_error());
-        return 1;
-    }
-    printf("\n----- HTTPS GET response -----\n");
-    dump_response(get_res);
-    delete get_req;
     
     while(1) {
         led = !led;
